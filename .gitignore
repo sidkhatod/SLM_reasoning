@@ -1,0 +1,20 @@
+# Environment credentials
+.env
+.env.*
+!.env.example
+
+# Weights & Biases logs
+wandb/
+
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Model checkpoints and outputs
+checkpoints/
+outputs/
+*.pt
+*.safetensors
