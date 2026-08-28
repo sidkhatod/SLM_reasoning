@@ -1,0 +1,23 @@
+# Documented for completeness; not run in the submitted results due to compute constraints — see generate_report.py output for which conditions have real numbers.
+base_model: Qwen/Qwen2.5-7B
+quantization: 4bit
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+learning_rate: 1e-5
+group_size: 8
+max_new_tokens: 512
+adaptive_kl:
+  beta_init: 0.04
+  beta_min: 0.01
+  beta_max: 0.3
+reward_weights:
+  outcome: 0.4
+  prm: 0.2
+  consensus: 0.2
+  consistency: 0.1
+  self_correction: 0.05
+  format: 0.05
+use_spm: true
+use_icr: true
+use_dsac: false
