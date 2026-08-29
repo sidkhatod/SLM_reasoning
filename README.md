@@ -1,4 +1,4 @@
-# PRISM-GRPO 
+# PRISM-GRPO (Progressive Reasoning through Implicit Semantic Modeling)
 
 **PRISM-GRPO** is a memory-conscious framework for fine-tuning small language models (like Qwen2.5-7B) using a highly customized 3-layer extension of Group Relative Policy Optimization (GRPO). It is designed from the ground up to operate within the constraints of a single 16GB GPU (e.g., Google Colab, Kaggle) utilizing 4-bit quantization, gradient checkpointing, and dynamic batching.
 
