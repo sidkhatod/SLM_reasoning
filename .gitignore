@@ -3,18 +3,53 @@
 .env.*
 !.env.example
 
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
 # Weights & Biases logs
 wandb/
 
 # Python cache and build files
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
 .ipynb_checkpoints/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
 
-# Model checkpoints and outputs
-checkpoints/
+# Training outputs and checkpoints
 outputs/
-*.pt
+checkpoints/
+runs/
+
+# Model weights and LoRA adapters - never commit these
 *.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+adapter_model*
+adapter_config.json
+
+# Downloaded dataset / model caches
+.cache/
+hf_cache/
+.huggingface/
+huggingface/
+data/raw/
+datasets/
+*.arrow
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
