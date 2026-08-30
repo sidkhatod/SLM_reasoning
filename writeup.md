@@ -44,12 +44,12 @@ Our primary experiments utilize the Qwen 2.5 7B base model. This model was selec
 
 The training data pipeline aggregates three open-access datasets:
 *   **GSM8K:** Used for primary RL training on multi-step math with verifiable rewards (7,473 train / 1,319 test).
-*   **AQUA-RAT:** Provides algebraic reasoning with rationales to boost generalization (~3,000 train / [NEED: test split size]).
-*   **StrategyQA:** Tests implicit multi-hop commonsense reasoning with verifiable yes/no rewards (2,290 train / 490 test).
+*   **AQUA-RAT:** Provides algebraic reasoning with rationales to boost generalization (3,000 train, subsampled from the full 97,467-example split so it does not swamp the other two sources / 254 test).
+*   **StrategyQA:** Tests implicit multi-hop commonsense reasoning with verifiable yes/no rewards (2,290 labeled examples in total). The official release publishes 2,290 train items and a 490-item dev set whose labels are withheld, so we use the `ChilleD/StrategyQA` re-split of the same 2,290 labeled examples into 1,603 train / 687 test. Our reported StrategyQA numbers are therefore on 687 held-out questions, not the 490-item official dev set.
 
-Phase 1 (SFT Warmup) utilizes chain-of-thought traces from these datasets with a learning rate of 2e-4 on a cosine schedule. [NEED: SFT batch size and epoch count]. Phase 2 (GRPO) operates with a learning rate of 1e-5. During GRPO, we sample `G=8` completions per problem, restricted to a maximum of 512 tokens. [NEED: GRPO batch size and total RL steps].
+Phase 1 (SFT Warmup) utilizes chain-of-thought traces from these datasets with a learning rate of 2e-4 on a cosine schedule over 100 warmup steps, a per-device batch size of 4 with 8 gradient accumulation steps (effective batch 32), for 2 epochs at a maximum sequence length of 512. Loss is computed on the completion tokens only; the prompt is masked out with `-100` so the warmup does not spend capacity learning to generate questions. Phase 2 (GRPO) operates with a learning rate of 1e-5 over 1,000 optimizer steps. Each step consumes 2 problems x `G=8` completions, so one step scores 16 rollouts and a full run scores 16,000 completions. Completions are capped at 512 new tokens, sampled at temperature 0.9 with top-p 0.95, and the PPO clip is 0.2.
 
-We employ two pre-trained models as frozen tools during the pipeline. The Math-Shepherd PRM (based on Mistral 7B) provides the step-level reward signal, and all-MiniLM-L6-v2 (a 22M parameter sentence transformer) serves as the semantic encoder for ICR step similarity computation. The pipeline is implemented using a modified version of the Hugging Face TRL framework combined with PEFT.
+We employ two pre-trained models as frozen tools during the pipeline. The Math-Shepherd PRM (based on Mistral 7B) provides the step-level reward signal, and all-MiniLM-L6-v2 (a 22M parameter sentence transformer) serves as the semantic encoder for ICR step similarity computation. The pipeline is implemented on PEFT with a purpose-built GRPO loop rather than a subclass of `trl.GRPOTrainer`. TRL's GRPO implementation broadcasts one scalar advantage across every token of a completion, which Layer 1 cannot work with - SPM needs per-token advantages to dampen the negative gradient on shared valid prefixes while leaving the divergent tail at full strength. The objective itself is unchanged from standard GRPO: group-normalised advantages, a PPO clip at 0.2, and a k3 KL estimate against a reference policy. The reference policy is the frozen base model, recovered by disabling the LoRA adapter, so no second copy of the 7B weights is held in VRAM.
 
 ## Core Research Findings & Training Dynamics
 
@@ -67,6 +67,19 @@ Curriculum blindness frequently led to entropy collapse early in our baseline te
 We also encountered classic reward hacking dynamics regarding formatting. When the format reward was weighted too heavily, the model learned to prioritize generating perfectly structured chain-of-thought tags while allowing the actual reasoning quality to degrade. We mitigated this by strictly constraining the format reward component to 0.05. 
 
 Furthermore, we found that static KL divergence penalties often resulted in distribution collapse or severe over-constraint. We implemented a PID-style feedback loop for adaptive KL control, initialized at `beta = 0.04` and bounded between `[0.01, 0.3]`. Finally, to further prevent reward hacking on the training distribution, we adopted a best practice of checkpointing based strictly on validation accuracy rather than the final training step.
+
+## Implementation Status
+
+All numbers in the next section are **projections, not measurements**. The training and evaluation
+code is implemented and runs end-to-end, but no full-scale run against Qwen 2.5 7B has been executed
+yet, and no ablation condition has produced a benchmark result. `evaluation/generate_report.py`
+reflects this directly: it discovers results from the files that exist and prints "not run" for every
+condition that has none, so the report can never present a projection as a measurement.
+
+The same applies to the training-dynamics claims above. The LLD Severity Score, IVS and Productive
+Zone Ratio are implemented and logged every step, and the tests assert their behaviour on constructed
+groups, but the statements about how they move over a real run are hypotheses the instrumentation is
+built to test.
 
 ## Projected Results
 
