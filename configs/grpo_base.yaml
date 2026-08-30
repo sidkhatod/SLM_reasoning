@@ -1,16 +1,46 @@
+# Phase 2: PRISM-GRPO. Base config with all three layers enabled (= ablation A6).
 base_model: Qwen/Qwen2.5-7B
 quantization: 4bit
+gradient_checkpointing: true
+
 lora_r: 64
 lora_alpha: 128
 lora_dropout: 0.05
+lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
 learning_rate: 1e-5
-group_size: 8          # G completions per prompt — note in a comment that this may need
-                       # to drop to 4 if 16GB VRAM can't hold G=8 generation + PRM scoring
+warmup_steps: 20
+max_grad_norm: 1.0
+
+# --- Rollout ---------------------------------------------------------------
+# G completions per problem. On 2x 24GB, G=8 x 512 tokens fits alongside the 4-bit
+# policy and the 4-bit PRM. Drop to 4 on a single 16GB card, or set use_prm: false.
+group_size: 8
 max_new_tokens: 512
+max_prompt_length: 512
+temperature: 0.9
+top_p: 0.95
+
+# --- Optimisation ----------------------------------------------------------
+# One optimizer step consumes `groups_per_step` problems x `group_size` completions,
+# i.e. 2 x 8 = 16 rollouts per update. 1,000 steps = 16k scored completions.
+groups_per_step: 2
+max_steps: 1000
+clip_epsilon: 0.2
+
+# --- Adaptive KL (PID-style) ----------------------------------------------
+# A static beta reliably either collapsed the distribution or over-constrained it,
+# so beta is driven toward a target KL and clamped to a safe band.
 adaptive_kl:
   beta_init: 0.04
   beta_min: 0.01
   beta_max: 0.3
+  target_kl: 0.1
+  kp: 0.1
+
+# --- 6-component reward ----------------------------------------------------
+# Format is deliberately pinned at 0.05: weighting it higher produced reward hacking,
+# where the model perfected the CoT scaffolding while reasoning quality degraded.
 reward_weights:
   outcome: 0.40
   prm: 0.20
@@ -18,3 +48,50 @@ reward_weights:
   consistency: 0.10
   self_correction: 0.05
   format: 0.05
+# When a component is disabled below, its weight is spread over the rest so the
+# reward stays on a [0, 1] scale and runs remain comparable across ablations.
+redistribute_disabled_reward_weight: true
+
+# --- Layers ----------------------------------------------------------------
+use_spm: true
+use_icr: true
+use_dsac: true
+# Math-Shepherd PRM (Mistral-7B). Set false if it will not co-reside with the policy.
+use_prm: true
+prm_model_id: peiyi9979/math-shepherd-mistral-7b-prm
+# Reload/free the PRM around every group. Only needed when VRAM cannot hold both;
+# it costs a full model load per step.
+prm_unload_after_scoring: false
+
+# Layer 1 - SPM. Soft masking (0.5) beat hard masking (1.0) on shared tokens.
+spm_mask_strength: 0.5
+nthr_bonus_strength: 0.1
+
+# Layer 2 - ICR.
+icr_similarity_threshold: 0.75
+icr_discriminative_threshold: 0.5
+
+# Layer 3 - DSAC. The candidate pool must exceed the buffer size or the curriculum
+# exerts no selection pressure; 256 -> 64 keeps a 4:1 ratio.
+dsac_refresh_steps: 50
+dsac_candidate_pool: 256
+dsac_buffer_size: 64
+dsac_p_buffer: 0.8
+dsac_target_validity: 0.5
+dsac_target_uncertainty: 0.5
+dsac_validity_weight: 1.0
+dsac_uncertainty_weight: 1.0
+dsac_probe_new_tokens: 20
+dsac_uncertainty_samples: 4
+dsac_uncertainty_new_tokens: 30
+
+# --- Data / eval / logging -------------------------------------------------
+datasets: [gsm8k, aqua_rat, strategyqa]
+val_size: 200
+# Checkpoints are selected on held-out validation accuracy, never on the final
+# training step - the guard against shipping a reward-hacked policy.
+eval_steps: 100
+eval_samples: 100
+save_steps: 100
+logging_steps: 10
+wandb_project: prism-grpo

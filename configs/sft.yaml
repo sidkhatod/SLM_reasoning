@@ -1,13 +1,26 @@
+# Phase 1: SFT warmup on aggregated chain-of-thought traces.
 base_model: Qwen/Qwen2.5-7B
 quantization: 4bit
+
 lora_r: 64
 lora_alpha: 128
 lora_dropout: 0.05
 lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
 learning_rate: 2e-4
 lr_schedule: cosine
+warmup_steps: 100
+max_grad_norm: 1.0
 max_seq_length: 512
 gradient_checkpointing: true
-# batch_size and epochs left as null/placeholder — to be tuned empirically on real hardware
-batch_size: null
-epochs: null
+
+# Sized for 2x 24GB with 4-bit QLoRA + gradient checkpointing at seq len 512.
+# Effective batch = batch_size * gradient_accumulation_steps = 32.
+batch_size: 4
+gradient_accumulation_steps: 8
+epochs: 2
+
+datasets: [gsm8k, aqua_rat, strategyqa]
+save_steps: 200
+output_dir: outputs/sft_qwen2.5-7b
+wandb_project: prism-grpo

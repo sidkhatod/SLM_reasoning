@@ -1,0 +1,9 @@
+# A7 (bonus): cross-model generalization check on Phi-3-Mini 3.8B.
+# Confirms the architecture is not Qwen-specific. Phi-3 uses fused qkv/gate-up
+# projections, so the LoRA target modules differ from the Qwen set.
+extends: ../grpo_base.yaml
+base_model: microsoft/Phi-3-mini-4k-instruct
+lora_target_modules: [qkv_proj, o_proj, gate_up_proj, down_proj]
+use_spm: true
+use_icr: true
+use_dsac: true
