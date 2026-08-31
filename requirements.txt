@@ -1,13 +1,25 @@
-transformers>=4.40.0
-trl>=0.8.1
-peft>=0.10.0
-bitsandbytes>=0.43.1
-accelerate>=0.29.3
-sentence-transformers>=2.7.0
-datasets>=2.19.0
-wandb>=0.16.6
+# Core
 torch>=2.2.0
-scipy>=1.13.0
+transformers>=4.44.0
+peft>=0.11.0
+accelerate>=0.30.0
+datasets>=2.19.0
+sentence-transformers>=2.7.0
+
+# 4-bit QLoRA. Linux/WSL wheels are first-class; on native Windows install
+# bitsandbytes>=0.43 (CUDA builds only). Training falls back to fp32 without it.
+bitsandbytes>=0.43.1
+
+# Utilities
 numpy>=1.26.4
+scipy>=1.13.0
 pyyaml>=6.0.1
+tqdm>=4.66.0
+safetensors>=0.4.3
 python-dotenv>=1.0.1
+
+# Telemetry (optional at runtime - the pipeline logs to stdout without it)
+wandb>=0.16.6
+
+# Tests
+pytest>=8.0.0
